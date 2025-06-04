@@ -114,6 +114,9 @@ module LibMagic
     end
 
     def file(path)
+      unless File.exist?(path)
+        raise MagicError, "Nonexistant file: #{path}"
+      end
       result = LibMagic.magic_file(ctx_pointer, path)
       handle_result(result)
     end
@@ -228,27 +231,27 @@ module LibMagic
     end
   end
 
-  def mime_type(path_or_data)
-    if File.exist?(path_or_data.to_s)
-      file(path_or_data, MAGIC_MIME_TYPE)
-    else
-      buffer(path_or_data, MAGIC_MIME_TYPE)
-    end
+  def mime_type_file(path)
+    file(path, MAGIC_MIME_TYPE)
   end
 
-  def mime_encoding(path_or_data)
-    if File.exist?(path_or_data.to_s)
-      file(path_or_data, MAGIC_MIME_ENCODING)
-    else
-      buffer(path_or_data, MAGIC_MIME_ENCODING)
-    end
+  def mime_type_buffer(buf)
+    buffer(buf, MAGIC_MIME_TYPE)
   end
 
-  def mime(path_or_data)
-    if File.exist?(path_or_data.to_s)
-      file(path_or_data, MAGIC_MIME)
-    else
-      buffer(path_or_data, MAGIC_MIME)
-    end
+  def mime_encoding_file(path)
+    file(path, MAGIC_MIME_ENCODING)
+  end
+
+  def mime_encoding_buffer(buf)
+    buffer(buf, MAGIC_MIME_ENCODING)
+  end
+
+  def mime_file(path)
+    file(path, MAGIC_MIME)
+  end
+
+  def mime_buffer(buf)
+    buffer(buf, MAGIC_MIME)
   end
 end
