@@ -6,7 +6,15 @@ module LibMagic
   begin
     ffi_lib 'magic'
   rescue LoadError
-    raise LoadError, "Could not find libmagic. Please install libmagic development package."
+    begin
+      ffi_lib 'libmagic'
+    rescue LoadError
+      begin
+        ffi_lib 'libmagic.so'
+      rescue LoadError
+        ffi_lib 'libmagic.so.1'
+      end
+    end
   end
 
   # Magic flags constants
