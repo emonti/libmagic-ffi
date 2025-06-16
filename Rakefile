@@ -1,4 +1,10 @@
 # Rakefile
+
+begin
+  require 'bundler/gem_tasks'
+rescue LoadError
+end
+
 require 'rake/testtask'
 
 Rake::TestTask.new(:test) do |t|
