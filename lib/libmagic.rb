@@ -1,8 +1,9 @@
 require 'ffi'
 
+# LibMagic is ruby FFI bindings for the libmagic native library
 module LibMagic
   extend FFI::Library
-  
+
   begin
     ffi_lib 'magic'
   rescue LoadError
@@ -50,24 +51,26 @@ module LibMagic
   # Core libmagic functions
   attach_function :magic_open, [:int], :magic_t
   attach_function :magic_close, [:magic_t], :void
-  attach_function :magic_getpath, [:string, :int], :string
-  attach_function :magic_file, [:magic_t, :string], :string
-  attach_function :magic_descriptor, [:magic_t, :int], :string
-  attach_function :magic_buffer, [:magic_t, :pointer, :size_t], :string
+  attach_function :magic_getpath, %i[string int], :string
+  attach_function :magic_file, %i[magic_t string], :string
+  attach_function :magic_descriptor, %i[magic_t int], :string
+  attach_function :magic_buffer, %i[magic_t pointer size_t], :string
   attach_function :magic_error, [:magic_t], :string
-  attach_function :magic_setflags, [:magic_t, :int], :int
+  attach_function :magic_setflags, %i[magic_t int], :int
   attach_function :magic_version, [], :int
-  attach_function :magic_load, [:magic_t, :string], :int
-  attach_function :magic_compile, [:magic_t, :string], :int
-  attach_function :magic_check, [:magic_t, :string], :int
-  attach_function :magic_list, [:magic_t, :string], :int
+  attach_function :magic_load, %i[magic_t string], :int
+  attach_function :magic_compile, %i[magic_t string], :int
+  attach_function :magic_check, %i[magic_t string], :int
+  attach_function :magic_list, %i[magic_t string], :int
   attach_function :magic_errno, [:magic_t], :int
 
   class MagicError < RuntimeError
   end
 
+  # LibMagic::Magic
   class Magic
-    class Magic_T
+    # MagicT is a wrapper around the ffi pointer used internally by the library
+    class MagicT
       attr_reader :closed
 
       def initialize(pointer)
@@ -76,14 +79,13 @@ module LibMagic
       end
 
       def closed?
-        return (@closed or @pointer.null?)
+        (@closed or @pointer.null?)
       end
 
       def pointer
-        if closed?
-          raise MagicError, "Attempt to use a freed/closed magic context pointer"
-        end
-        return @pointer
+        raise MagicError, 'Attempt to use a freed/closed magic context pointer' if closed?
+
+        @pointer
       end
 
       def close
@@ -102,17 +104,17 @@ module LibMagic
       @flags = flags
       p = LibMagic.magic_open(flags)
 
-      raise MagicError, "Unable to initialize magic context" if p.null?
+      raise MagicError, 'Unable to initialize magic context' if p.null?
 
-       # Load default magic database
+      # Load default magic database
       if LibMagic.magic_load(p, path) != 0
         error_msg = LibMagic.magic_error(p)
         LibMagic.magic_close(p)
         raise MagicError, "Unable to load magic database: #{error_msg}"
       end
 
-      @context = Magic_T.new(p)
-     
+      @context = MagicT.new(p)
+
       # Set up finalizer to clean up context
       ObjectSpace.define_finalizer(self, self.class.finalizer(@context))
     end
@@ -122,35 +124,32 @@ module LibMagic
     end
 
     def file(path)
-      unless File.exist?(path)
-        raise MagicError, "Nonexistant file: #{path}"
-      end
+      raise MagicError, "Nonexistant file: #{path}" unless File.exist?(path)
+
       result = LibMagic.magic_file(ctx_pointer, path)
       handle_result(result)
     end
 
     def buffer(data)
-      if data.is_a?(String)
-        buffer_ptr = FFI::MemoryPointer.new(:char, data.bytesize)
-        buffer_ptr.put_bytes(0, data)
-        result = LibMagic.magic_buffer(ctx_pointer, buffer_ptr, data.bytesize)
-      else
-        raise ArgumentError, "Data must be a String"
-      end
+      raise ArgumentError, 'Data must be a String' unless data.is_a?(String)
+
+      buffer_ptr = FFI::MemoryPointer.new(:char, data.bytesize)
+      buffer_ptr.put_bytes(0, data)
+      result = LibMagic.magic_buffer(ctx_pointer, buffer_ptr, data.bytesize)
+
       handle_result(result)
     end
 
-    def descriptor(fd)
-      result = LibMagic.magic_descriptor(ctx_pointer, fd)
+    def descriptor(ifd)
+      result = LibMagic.magic_descriptor(ctx_pointer, ifd)
       handle_result(result)
     end
 
     def setflags(flags)
       @flags = flags
       result = LibMagic.magic_setflags(ctx_pointer, flags)
-      if result < 0
-        raise MagicError, "Unable to set flags: #{error}"
-      end
+      raise MagicError, "Unable to set flags: #{error}" if result.negative?
+
       result
     end
 
@@ -168,24 +167,24 @@ module LibMagic
 
     def load(path = nil)
       result = LibMagic.magic_load(ctx_pointer, path)
-      handle_result(result, fail_msg: "Unable to load magic database")
+      handle_result(result, fail_msg: 'Unable to load magic database')
       result
     end
 
     def compile(path)
       result = LibMagic.magic_compile(ctx_pointer, path)
-      handle_result(result, fail_msg: "Unable to compile magic database")
+      handle_result(result, fail_msg: 'Unable to compile magic database')
     end
 
     def check(path)
       result = LibMagic.magic_check(ctx_pointer, path)
-      handle_result(result, fail_msg: "Magic database check failed")
+      handle_result(result, fail_msg: 'Magic database check failed')
       result
     end
 
     def list(path)
       result = LibMagic.magic_list(ctx_pointer, path)
-      handle_result(result, fail_msg: "Unable to list magic database")
+      handle_result(result, fail_msg: 'Unable to list magic database')
       result
     end
 
@@ -197,7 +196,7 @@ module LibMagic
 
     def handle_result(result, fail_msg: nil)
       if result.nil?
-        fail_msg ||= "Magic operation failed"
+        fail_msg ||= 'Magic operation failed'
         error_msg = "#{fail_msg}: #{error}"
         raise MagicError, "Magic operation failed: #{error_msg}"
       end
@@ -205,16 +204,14 @@ module LibMagic
     end
 
     def ctx_pointer
-      if @context and @context.pointer and not @context.closed
-        return @context.pointer
-      else
-        raise MagicError, "Attempt to use freed or uninitialized magic context pointer"
-      end
-    end
+      return @context.pointer if @context&.pointer && !@context.closed
 
+      raise MagicError, 'Attempt to use freed or uninitialized magic context pointer'
+    end
   end
 
   # Convenience module methods
+  #
   module_function
 
   def version
@@ -239,7 +236,7 @@ module LibMagic
     end
   end
 
-  def mime_type_file(path)
+  def mime_type(path)
     file(path, MAGIC_MIME_TYPE)
   end
 
@@ -247,7 +244,7 @@ module LibMagic
     buffer(buf, MAGIC_MIME_TYPE)
   end
 
-  def mime_encoding_file(path)
+  def mime_encoding(path)
     file(path, MAGIC_MIME_ENCODING)
   end
 
@@ -255,7 +252,7 @@ module LibMagic
     buffer(buf, MAGIC_MIME_ENCODING)
   end
 
-  def mime_file(path)
+  def mime(path)
     file(path, MAGIC_MIME)
   end
 

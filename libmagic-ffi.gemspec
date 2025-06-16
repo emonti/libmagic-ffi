@@ -1,7 +1,7 @@
 
 Gem::Specification.new do |s|
     s.name          = "libmagic-ffi"
-    s.version       = "1.0.1"
+    s.version       = "1.0.2"
     s.summary       = "LibMagic FFI"
     s.description   = "LibMagic FFI bindings with some helper sugar"
     s.authors       = ["Eric Monti"]
