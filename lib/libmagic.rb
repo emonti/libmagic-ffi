@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require 'ffi'
 
 # LibMagic is ruby FFI bindings for the libmagic native library
